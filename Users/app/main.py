@@ -5,12 +5,18 @@ import psycopg2
 import random
 import string
 from datetime import datetime, timedelta
+from passlib.context import CryptContext
 
 app = FastAPI()
+
+# Password Hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Generate a 6-digit OTP
 def generate_otp_code(length=6):
     return ''.join(random.choices(string.digits, k=length))
+
+
 
 #create Business profile
 @app.post("/Business/", response_model=Business)
@@ -20,7 +26,7 @@ def create_business_profile(business: UserBusiness):
         with conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "INSERT INTO Business (Full_Name, Email, Phone, HQ, Operations, Website, Details) VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id, Full_Name, email",
+                    "INSERT INTO Business (company_name, Email, Phone, HQ, Operations, Website, Details) VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id, company_name, email",
                     (business.name, business.email, business.phone, business.hq, business.operations, business.website, business.details)
                 )
                 new_user = cur.fetchone()
@@ -113,9 +119,10 @@ def create_user(user: UserCreate):
     try:
         with conn:
             with conn.cursor() as cur:
+                hashed_password = pwd_context.hash(user.password)
                 cur.execute(
-                    "INSERT INTO users (Full_Name, Email, Phone, Password, Role, Company_id) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id, Full_Name, Email",
-                    (user.name, user.email, user.phone, user.password, user.role, user.company)
+                    "INSERT INTO users (name, Email, Phone, Password, Role, Company_id) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id, name, Email",
+                    (user.name, user.email, user.phone, hashed_password, user.role, user.company_id)
                 )
                 new_user = cur.fetchone()
                 if not new_user:

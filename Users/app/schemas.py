@@ -15,7 +15,7 @@ class UserBusiness(BaseModel):
 # output after busines profile creation
 class Business(BaseModel):
     id: int
-    full_name: str
+    company_name: str
     email: EmailStr
 
 #Generate OTP Request
@@ -41,13 +41,13 @@ class OTPVerifyResponse(BaseModel):
 
 class UserCreate(BaseModel):
     name: str
-    email: str
+    email: EmailStr
     phone: str
     password: str
-    company: str
+    company_id: int
     role: str
 
 class User(BaseModel):
     id: int
-    full_name: str
+    name: str
     email: str
