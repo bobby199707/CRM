@@ -109,22 +109,23 @@ def create_business_profile(business: UserBusiness, conn=Depends(get_db)):
 @app.post("/generate-otp/", response_model=OTPGenerateResponse, dependencies=[Depends(RateLimiter(times=5, seconds=60))])
 async def generate_otp(request: OTPGenerateRequest, conn=Depends(get_db)):
     try:
-        # Check if email exists in Business table
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            # Check if email exists in Business table
             cur.execute("SELECT id FROM Business WHERE email = %s", (request.email,))
             if not cur.fetchone():
                 logger.warning(f"Email not found for OTP generation: {request.email}")
                 raise HTTPException(status_code=404, detail="Email not associated with a business")
 
             otp = generate_otp_code()
+            hashed_otp = pwd_context.hash(otp)
             expires_at = datetime.utcnow() + timedelta(minutes=5)
 
             # Delete any existing OTP for this email
             cur.execute("DELETE FROM otps WHERE email = %s", (request.email,))
             # Insert new OTP
             cur.execute(
-                "INSERT INTO otps (email, otp, expires_at) VALUES (%s, %s, %s) RETURNING email, otp, expires_at",
-                (request.email, otp, expires_at)
+                "INSERT INTO otps (email, otp, expires_at) VALUES (%s, %s, %s) RETURNING email, expires_at",
+                (request.email, hashed_otp, expires_at)
             )
             result = cur.fetchone()
             if not result:
@@ -132,7 +133,8 @@ async def generate_otp(request: OTPGenerateRequest, conn=Depends(get_db)):
                 raise HTTPException(status_code=500, detail="Failed to generate OTP")
             conn.commit()
             logger.info(f"Generated OTP for: {request.email}")
-            return result
+            # Return plain OTP in response (not hashed)
+            return OTPGenerateResponse(email=result["email"], otp=otp, expires_at=result["expires_at"])
     except psycopg2.Error as e:
         conn.rollback()
         logger.error(f"Database error in generate_otp: {str(e)}")
@@ -169,8 +171,8 @@ async def verify_otp(request: OTPVerifyRequest, conn=Depends(get_db)):
                     message="OTP has expired"
                 )
 
-            # Verify OTP
-            if request.otp == stored_otp:
+            # Verify OTP against hashed OTP
+            if pwd_context.verify(request.otp, stored_otp):
                 # Delete OTP after successful verification
                 cur.execute("DELETE FROM otps WHERE email = %s", (request.email,))
                 # Mark business as verified

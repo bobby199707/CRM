@@ -30,3 +30,5 @@ CREATE TABLE otps (
     expires_at TIMESTAMP NOT NULL,
     CONSTRAINT unique_email UNIQUE (email)
 );
+
+ALTER TABLE otps ALTER COLUMN otp TYPE VARCHAR(255);
