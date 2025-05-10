@@ -1,6 +1,7 @@
 from pydantic import BaseModel, EmailStr, Field, validator
 from datetime import datetime
 import re
+import bleach
 
 class UserBusiness(BaseModel):
     name: str = Field(..., min_length=1, max_length=255, description="Company name")
@@ -24,6 +25,10 @@ class UserBusiness(BaseModel):
         if not re.match(r"^(https?://)?[\w.-]+\.[a-zA-Z]{2,}(/.*)?$", v):
             raise ValueError("Invalid website URL")
         return v
+    
+    @validator("details", "operations")
+    def sanitize_text(cls, v):
+        return bleach.clean(v)
 
 class Business(BaseModel):
     id: int
